@@ -9,7 +9,7 @@ load_dotenv(override=True)
 class OpenRouterClient:
     def __init__(self):
         self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
-        self.model = os.getenv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free")
+        self.model = os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
         self.base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
     def chat(self, system: str, user: str, max_tokens: int = 800) -> str:
