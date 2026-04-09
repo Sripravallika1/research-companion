@@ -6,7 +6,7 @@ import requests
 class OpenRouterClient:
     def __init__(self):
         self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
-        self.model = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+        self.model = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct")
         self.base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
     def chat(self, system: str, user: str, max_tokens: int = 800) -> str:
