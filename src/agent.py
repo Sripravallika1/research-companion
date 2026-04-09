@@ -1,6 +1,8 @@
 # src/agent.py
-from dataclasses import dataclass, field
-from src.openrouter_client import OpenRouterClient
+import os
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
 
 
 def build_system_prompt(mode: str) -> str:
@@ -29,14 +31,21 @@ def build_system_prompt(mode: str) -> str:
         )
     return base
 
-@dataclass
+
 class RAGAgent:
     """
-    Agent that orchestrates retrieval + answer generation via OpenRouter.
-    Uses Agno-style dataclass pattern for clean agent definition.
+    Agent that orchestrates retrieval + answer generation via Agno and OpenRouter.
     """
-    client: OpenRouterClient = field(default_factory=OpenRouterClient)
-    name: str = "research-companion-agent"
+
+    def __init__(self) -> None:
+        self._agent = Agent(
+            model=OpenAIChat(
+                id=os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free"),
+                base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+                api_key=os.getenv("OPENROUTER_API_KEY"),
+            ),
+            markdown=False,
+        )
 
     def answer(self, question: str, mode: str, sources: list[dict]) -> str:
         """Generate a grounded answer from retrieved source chunks."""
@@ -55,20 +64,29 @@ class RAGAgent:
         context = "\n\n---\n\n".join(formatted)
         system = build_system_prompt(mode)
         user_msg = (
+            f"{system}\n\n"
             f"QUESTION:\n{question}\n\n"
             f"SOURCES:\n{context}\n\n"
             "Provide your answer with inline citations."
         )
-        return self.client.chat(system=system, user=user_msg)
+        try:
+            response = self._agent.run(user_msg)
+            return str(response.content)
+        except Exception as exc:
+            raise RuntimeError(str(exc)) from exc
 
     def summarize(self, sources: list[dict], filename: str) -> str:
         """Summarize a document based on its top chunks."""
         if not sources:
             return "No content found to summarize."
         context = "\n\n".join([s["text"] for s in sources[:6]])
-        system = (
+        user_msg = (
             "You are a document summarizer. Summarize the document content below "
-            "into 3-5 clear bullet points. Be concise and factual."
+            "into 3-5 clear bullet points. Be concise and factual.\n\n"
+            f"Document: {filename}\n\nContent:\n{context}\n\nProvide a concise summary."
         )
-        user_msg = f"Document: {filename}\n\nContent:\n{context}\n\nProvide a concise summary."
-        return self.client.chat(system=system, user=user_msg, max_tokens=400)
+        try:
+            response = self._agent.run(user_msg)
+            return str(response.content)
+        except Exception as exc:
+            raise RuntimeError(str(exc)) from exc
