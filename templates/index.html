@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Research Companion — AI Document Intelligence</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f0f1a;
+      --surface:   #1a1a2e;
+      --surface2:  #16213e;
+      --border:    #2a2a4a;
+      --accent1:   #667eea;
+      --accent2:   #764ba2;
+      --text:      #e2e8f0;
+      --text-dim:  #94a3b8;
+      --success:   #4ade80;
+      --error:     #f87171;
+      --warning:   #fbbf24;
+      --radius:    12px;
+      --shadow:    0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────────────── */
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--surface2) 0%, var(--surface) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .brand-icon {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .brand-text h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.3px; }
+    .brand-text p  { font-size: 0.78rem; color: var(--text-dim); }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+
+    /* ── Buttons ──────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 8px; font-size: 0.85rem;
+      font-weight: 500; cursor: pointer; border: none; transition: all 0.18s ease;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      color: #fff;
+    }
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-ghost {
+      background: transparent; color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .btn-danger {
+      background: transparent; color: var(--error);
+      border: 1px solid rgba(248,113,113,0.35);
+    }
+    .btn-danger:hover { background: rgba(248,113,113,0.1); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+    /* ── Main 2-column ────────────────────────────────────────────────────── */
+    main {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    /* ── Sidebar ──────────────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-section {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+
+    /* ── Upload Zone ──────────────────────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 28px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: var(--bg);
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent1);
+      background: rgba(102,126,234,0.06);
+    }
+    .upload-zone .icon { font-size: 2rem; margin-bottom: 8px; }
+    .upload-zone p    { font-size: 0.82rem; color: var(--text-dim); }
+    .upload-zone span { color: var(--accent1); font-weight: 500; }
+    #fileInput { display: none; }
+
+    /* ── Upload Status List ───────────────────────────────────────────────── */
+    #uploadStatus {
+      margin-top: 12px;
+      display: flex; flex-direction: column; gap: 6px;
+      max-height: 120px; overflow-y: auto;
+    }
+    .upload-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px; border-radius: 8px;
+      background: var(--bg); font-size: 0.8rem;
+    }
+    .upload-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .upload-item .status-icon { flex-shrink: 0; }
+
+    /* ── Doc List ─────────────────────────────────────────────────────────── */
+    .docs-scroll {
+      flex: 1; overflow-y: auto; padding: 16px 20px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .doc-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+      transition: border-color 0.18s;
+    }
+    .doc-card:hover { border-color: var(--accent1); }
+    .doc-card .doc-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .doc-card .doc-info { flex: 1; overflow: hidden; }
+    .doc-card .doc-name {
+      font-size: 0.82rem; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .doc-card .doc-id {
+      font-size: 0.68rem; color: var(--text-dim);
+      font-family: monospace; margin-top: 1px;
+    }
+    .btn-summarize {
+      padding: 4px 10px; font-size: 0.72rem; border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      color: #fff; border: none; cursor: pointer;
+      flex-shrink: 0; font-weight: 500; transition: opacity 0.15s;
+    }
+    .btn-summarize:hover { opacity: 0.82; }
+    .btn-summarize:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .empty-docs {
+      text-align: center; color: var(--text-dim);
+      font-size: 0.82rem; padding: 30px 0;
+    }
+    .empty-docs .big { font-size: 2.5rem; margin-bottom: 8px; }
+
+    /* ── Chat Panel ───────────────────────────────────────────────────────── */
+    .chat-panel {
+      display: flex; flex-direction: column;
+      overflow: hidden; background: var(--bg);
+    }
+
+    .chat-toolbar {
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface);
+      flex-wrap: wrap;
+    }
+
+    .mode-label { font-size: 0.78rem; color: var(--text-dim); }
+
+    .mode-group { display: flex; gap: 6px; }
+    .mode-btn {
+      padding: 5px 14px; border-radius: 20px; font-size: 0.78rem;
+      font-weight: 500; cursor: pointer; border: 1px solid var(--border);
+      background: transparent; color: var(--text-dim); transition: all 0.15s;
+    }
+    .mode-btn.active, .mode-btn:hover {
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      color: #fff; border-color: transparent;
+    }
+
+    /* ── Messages ─────────────────────────────────────────────────────────── */
+    #messages {
+      flex: 1; overflow-y: auto;
+      padding: 24px 22px;
+      display: flex; flex-direction: column; gap: 20px;
+      scroll-behavior: smooth;
+    }
+
+    .msg {
+      display: flex; gap: 12px; animation: fadeUp 0.25s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.user  { flex-direction: row-reverse; }
+    .msg.ai    { flex-direction: row; }
+
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .msg.user .avatar { background: linear-gradient(135deg, var(--accent1), var(--accent2)); }
+    .msg.ai   .avatar { background: var(--surface2); border: 1px solid var(--border); }
+
+    .bubble-wrap { max-width: 76%; display: flex; flex-direction: column; gap: 8px; }
+    .msg.user .bubble-wrap { align-items: flex-end; }
+
+    .bubble {
+      padding: 12px 16px; border-radius: 16px;
+      font-size: 0.9rem; line-height: 1.65;
+    }
+    .msg.user .bubble {
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      color: #fff; border-bottom-right-radius: 4px;
+    }
+    .msg.ai .bubble {
+      background: var(--surface); border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+
+    /* markdown-style inside bubble */
+    .bubble strong { color: #c4b5fd; }
+    .bubble ul, .bubble ol { padding-left: 18px; margin: 6px 0; }
+    .bubble li { margin: 3px 0; }
+    .bubble code {
+      background: rgba(255,255,255,0.08); padding: 1px 5px;
+      border-radius: 4px; font-family: monospace; font-size: 0.85em;
+    }
+
+    /* ── Citations ────────────────────────────────────────────────────────── */
+    .citations { display: flex; flex-direction: column; gap: 6px; }
+    .citation-label {
+      font-size: 0.72rem; color: var(--text-dim); font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase;
+    }
+
+    .citation-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden; font-size: 0.8rem;
+    }
+    .citation-header {
+      padding: 8px 12px; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      transition: background 0.15s;
+    }
+    .citation-header:hover { background: rgba(255,255,255,0.04); }
+    .citation-badge {
+      padding: 2px 8px; border-radius: 10px; font-size: 0.68rem;
+      font-weight: 600; color: #fff;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      flex-shrink: 0;
+    }
+    .citation-filename { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .citation-page { color: var(--text-dim); font-size: 0.72rem; flex-shrink: 0; }
+    .citation-score {
+      font-size: 0.7rem; color: var(--success); flex-shrink: 0;
+    }
+    .citation-chevron { color: var(--text-dim); transition: transform 0.2s; font-size: 0.7rem; }
+    .citation-card.open .citation-chevron { transform: rotate(90deg); }
+    .citation-body {
+      display: none; padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      color: var(--text-dim); font-size: 0.78rem; line-height: 1.6;
+    }
+    .citation-card.open .citation-body { display: block; }
+
+    /* ── Typing Indicator ─────────────────────────────────────────────────── */
+    .typing-indicator {
+      display: flex; gap: 12px; animation: fadeUp 0.25s ease;
+    }
+    .typing-dots {
+      padding: 14px 18px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 16px;
+      border-bottom-left-radius: 4px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .typing-dots span {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent1); display: block;
+      animation: bounce 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* ── Input Bar ────────────────────────────────────────────────────────── */
+    .input-bar {
+      padding: 16px 22px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; gap: 10px; align-items: flex-end;
+    }
+    #questionInput {
+      flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px 14px;
+      color: var(--text); font-size: 0.9rem; font-family: inherit;
+      resize: none; outline: none; line-height: 1.5; max-height: 120px;
+      transition: border-color 0.18s;
+      field-sizing: content;
+      min-height: 44px;
+    }
+    #questionInput:focus { border-color: var(--accent1); }
+    #questionInput::placeholder { color: var(--text-dim); }
+
+    #sendBtn {
+      width: 44px; height: 44px; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      color: #fff; cursor: pointer; font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.15s, transform 0.15s; flex-shrink: 0;
+    }
+    #sendBtn:hover:not(:disabled) { opacity: 0.85; transform: scale(1.05); }
+    #sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Welcome State ────────────────────────────────────────────────────── */
+    .welcome {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; color: var(--text-dim); gap: 14px;
+      padding: 40px;
+    }
+    .welcome .hero-icon { font-size: 4rem; }
+    .welcome h2 { font-size: 1.5rem; font-weight: 700; color: var(--text); }
+    .welcome p  { font-size: 0.88rem; max-width: 380px; }
+    .welcome-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+    .chip {
+      padding: 6px 14px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 20px;
+      font-size: 0.78rem; cursor: pointer; transition: all 0.15s;
+    }
+    .chip:hover {
+      border-color: var(--accent1); color: var(--text);
+      background: rgba(102,126,234,0.1);
+    }
+
+    /* ── Toast ────────────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 18px;
+      font-size: 0.85rem; box-shadow: var(--shadow);
+      transform: translateY(60px); opacity: 0; pointer-events: none;
+      transition: all 0.3s ease; max-width: 320px; z-index: 100;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.error { border-color: var(--error); color: var(--error); }
+    #toast.success { border-color: var(--success); color: var(--success); }
+
+    /* ── Scrollbar ────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3a5a; }
+
+    /* ── Responsive ───────────────────────────────────────────────────────── */
+    @media (max-width: 720px) {
+      main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .sidebar {
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .docs-scroll { flex-direction: row; flex-wrap: wrap; }
+      .doc-card { flex: 1 1 200px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🔬</div>
+      <div class="brand-text">
+        <h1>Research Companion</h1>
+        <p>AI Document Intelligence</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-danger" id="resetBtn" title="Clear all documents">
+        🗑 Reset
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
+    <aside class="sidebar">
+
+      <!-- Upload -->
+      <div class="sidebar-section">
+        <p class="section-title">📂 Upload Documents</p>
+        <div class="upload-zone" id="uploadZone">
+          <div class="icon">📄</div>
+          <p>Drag &amp; drop files here<br>or <span>click to browse</span></p>
+          <p style="margin-top:6px;font-size:0.72rem;">PDF · TXT · MD</p>
+        </div>
+        <input type="file" id="fileInput" multiple accept=".pdf,.txt,.md" />
+        <div id="uploadStatus"></div>
+      </div>
+
+      <!-- Doc List -->
+      <p class="section-title" style="padding:16px 20px 0;">📚 Indexed Documents</p>
+      <div class="docs-scroll" id="docList">
+        <div class="empty-docs">
+          <div class="big">📭</div>
+          <p>No documents yet.<br>Upload a file to get started.</p>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ── Chat Panel ────────────────────────────────────────────────────── -->
+    <section class="chat-panel">
+
+      <!-- Toolbar -->
+      <div class="chat-toolbar">
+        <span class="mode-label">Response mode:</span>
+        <div class="mode-group" id="modeGroup">
+          <button class="mode-btn active" data-mode="simple">Simple</button>
+          <button class="mode-btn"        data-mode="technical">Technical</button>
+          <button class="mode-btn"        data-mode="actionable">Actionable</button>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div id="messages">
+        <div class="welcome" id="welcomeScreen">
+          <div class="hero-icon">🤖</div>
+          <h2>Ask me anything</h2>
+          <p>Upload a document from the left panel, then ask questions about its content. I'll answer using only your documents.</p>
+          <div class="welcome-chips">
+            <div class="chip" data-prompt="Summarize the key points">Summarize key points</div>
+            <div class="chip" data-prompt="What are the main topics covered?">Main topics</div>
+            <div class="chip" data-prompt="List the action items or recommendations">Action items</div>
+            <div class="chip" data-prompt="What are the most important findings?">Key findings</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="input-bar">
+        <textarea
+          id="questionInput"
+          placeholder="Ask a question about your documents…"
+          rows="1"
+        ></textarea>
+        <button id="sendBtn" title="Send (Enter)">➤</button>
+      </div>
+
+    </section>
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
