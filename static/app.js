@@ -1,12 +1,12 @@
-/* ═══════════════════════════════════════════════════════════════════════════
+/* =================================================================
    Research Companion — app.js
    Pure vanilla JS, no frameworks.
-   ═══════════════════════════════════════════════════════════════════════════ */
+   ================================================================= */
 
 (function () {
   'use strict';
 
-  /* ── DOM refs ──────────────────────────────────────────────────────────── */
+  /* -- DOM refs ---------------------------------------------------- */
   const uploadZone    = document.getElementById('uploadZone');
   const fileInput     = document.getElementById('fileInput');
   const uploadStatus  = document.getElementById('uploadStatus');
@@ -19,14 +19,14 @@
   const modeGroup     = document.getElementById('modeGroup');
   const toast         = document.getElementById('toast');
 
-  /* ── State ─────────────────────────────────────────────────────────────── */
+  /* -- State ------------------------------------------------------- */
   let currentMode = 'simple';
   let isSending   = false;
   let toastTimer  = null;
 
-  /* ══════════════════════════════════════════════════════════════════════════
+  /* =================================================================
      UTILITIES
-     ══════════════════════════════════════════════════════════════════════════ */
+     ================================================================= */
 
   function escHtml(str) {
     return String(str)
@@ -36,40 +36,43 @@
       .replace(/"/g, '&quot;');
   }
 
-  /** Minimal markdown → HTML: **bold**, `code`, bullet lists */
+  /** Safely extract a plain-text error message from any thrown value. */
+  function errMsg(err) {
+    if (!err) return 'An unknown error occurred.';
+    if (typeof err === 'string') return err;
+    if (err instanceof Error) return err.message || String(err);
+    try { return JSON.stringify(err); } catch (_) { return String(err); }
+  }
+
+  /** Minimal markdown to HTML: **bold**, `code`, bullet lists */
   function renderMarkdown(text) {
     return escHtml(text)
-      // **bold**
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      // `code`
       .replace(/`([^`]+)`/g, '<code>$1</code>')
-      // bullet lines starting with - or *
       .replace(/^[-*]\s+(.+)$/gm, '<li>$1</li>')
-      // wrap consecutive <li> blocks in <ul>
-      .replace(/(<li>.*<\/li>\n?)+/g, m => '<ul>' + m + '</ul>')
-      // newlines to <br>
+      .replace(/(<li>.*<\/li>\n?)+/g, function (m) { return '<ul>' + m + '</ul>'; })
       .replace(/\n/g, '<br>');
   }
 
   function docIcon(filename) {
-    if (/\.pdf$/i.test(filename))  return '📄';
-    if (/\.md$/i.test(filename))   return '📝';
-    return '📃';
+    if (/\.pdf$/i.test(filename))  return '\uD83D\uDCC4';
+    if (/\.md$/i.test(filename))   return '\uD83D\uDCDD';
+    return '\uD83D\uDCC3';
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
+  /* =================================================================
      TOAST
-     ══════════════════════════════════════════════════════════════════════════ */
+     ================================================================= */
   function showToast(msg, type) {
     clearTimeout(toastTimer);
-    toast.textContent = msg;
+    toast.textContent = String(msg || 'Error');
     toast.className   = 'show ' + (type || '');
     toastTimer = setTimeout(function () { toast.className = ''; }, 3500);
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
+  /* =================================================================
      MODE TOGGLE
-     ══════════════════════════════════════════════════════════════════════════ */
+     ================================================================= */
   modeGroup.addEventListener('click', function (e) {
     const btn = e.target.closest('.mode-btn');
     if (!btn) return;
@@ -78,9 +81,9 @@
     currentMode = btn.dataset.mode;
   });
 
-  /* ══════════════════════════════════════════════════════════════════════════
-     UPLOAD — drag-and-drop + file input
-     ══════════════════════════════════════════════════════════════════════════ */
+  /* =================================================================
+     UPLOAD
+     ================================================================= */
   uploadZone.addEventListener('click', function () { fileInput.click(); });
 
   uploadZone.addEventListener('dragover', function (e) {
@@ -128,9 +131,10 @@
 
     try {
       const resp = await fetch('/api/docs', { method: 'POST', body: formData });
-      const data = await resp.json();
+      let data;
+      try { data = await resp.json(); } catch (_) { data = {}; }
 
-      if (!resp.ok) throw new Error(data.error || 'Upload failed');
+      if (!resp.ok) throw new Error(data.error || 'Upload failed (HTTP ' + resp.status + ')');
 
       (data.uploaded || []).forEach(function (r) {
         const el = items[r.filename];
@@ -150,22 +154,24 @@
       showToast('Indexed ' + files.length + ' file' + (files.length > 1 ? 's' : '') + ' successfully.', 'success');
       loadDocs();
     } catch (err) {
+      const msg = errMsg(err);
       Object.values(items).forEach(function (el) {
         el.querySelector('.status-icon').textContent = '\u274C';
-        el.querySelector('.info').textContent        = err.message;
+        el.querySelector('.info').textContent        = msg;
         el.querySelector('.info').style.color        = 'var(--error)';
       });
-      showToast(err.message, 'error');
+      showToast(msg, 'error');
     }
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
+  /* =================================================================
      DOCUMENT LIST
-     ══════════════════════════════════════════════════════════════════════════ */
+     ================================================================= */
   async function loadDocs() {
     try {
       const resp = await fetch('/api/docs');
-      const data = await resp.json();
+      let data;
+      try { data = await resp.json(); } catch (_) { data = { docs: [] }; }
       renderDocs(data.docs || []);
     } catch (_) { /* silent on initial load */ }
   }
@@ -199,9 +205,9 @@
     });
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
+  /* =================================================================
      SUMMARIZE
-     ══════════════════════════════════════════════════════════════════════════ */
+     ================================================================= */
   async function summarizeDoc(docId, filename, btn) {
     btn.disabled    = true;
     btn.textContent = '\u23F3';
@@ -215,24 +221,25 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ doc_id: docId, filename: filename })
       });
-      const data = await resp.json();
+      let data;
+      try { data = await resp.json(); } catch (_) { data = {}; }
       typingEl.remove();
 
-      if (!resp.ok) throw new Error(data.error || 'Summarize failed');
+      if (!resp.ok) throw new Error(data.error || 'Summarize failed (HTTP ' + resp.status + ')');
 
       appendMessage('ai', data.summary || 'No summary returned.', []);
     } catch (err) {
       typingEl.remove();
-      appendMessage('ai', '\u274C Error: ' + err.message, []);
+      appendMessage('ai', '\u274C Error: ' + errMsg(err), []);
     } finally {
       btn.disabled    = false;
       btn.textContent = 'Summarize';
     }
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
+  /* =================================================================
      CHAT
-     ══════════════════════════════════════════════════════════════════════════ */
+     ================================================================= */
   sendBtn.addEventListener('click', sendMessage);
 
   questionInput.addEventListener('keydown', function (e) {
@@ -242,14 +249,12 @@
     }
   });
 
-  // Auto-resize textarea (max height kept in sync with CSS max-height)
   const INPUT_MAX_HEIGHT = parseInt(getComputedStyle(questionInput).maxHeight, 10) || 120;
   questionInput.addEventListener('input', function () {
     this.style.height = 'auto';
     this.style.height = Math.min(this.scrollHeight, INPUT_MAX_HEIGHT) + 'px';
   });
 
-  // Quick-question chips
   document.querySelectorAll('.chip[data-prompt]').forEach(function (chip) {
     chip.addEventListener('click', function () {
       questionInput.value = chip.dataset.prompt;
@@ -266,7 +271,6 @@
     questionInput.value = '';
     questionInput.style.height = '';
 
-    // Hide welcome screen on first message
     if (welcomeScreen) welcomeScreen.style.display = 'none';
 
     appendMessage('user', question);
@@ -278,16 +282,18 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question, mode: currentMode })
       });
-      const data = await resp.json();
+      let data;
+      try { data = await resp.json(); } catch (_) { data = {}; }
       typingEl.remove();
 
-      if (!resp.ok) throw new Error(data.error || 'Chat request failed');
+      if (!resp.ok) throw new Error(data.error || 'Chat request failed (HTTP ' + resp.status + ')');
 
       appendMessage('ai', data.answer || '(no answer)', data.citations || []);
     } catch (err) {
       typingEl.remove();
-      appendMessage('ai', '\u274C ' + err.message, []);
-      showToast(err.message, 'error');
+      const msg = errMsg(err);
+      appendMessage('ai', '\u274C ' + msg, []);
+      showToast(msg, 'error');
     } finally {
       isSending        = false;
       sendBtn.disabled = false;
@@ -295,7 +301,7 @@
     }
   }
 
-  /* ── Message rendering ─────────────────────────────────────────────────── */
+  /* -- Message rendering ------------------------------------------- */
   function appendMessage(role, text, citations) {
     const wrap = document.createElement('div');
     wrap.className = 'msg ' + role;
@@ -312,7 +318,6 @@
     bubble.innerHTML = role === 'ai' ? renderMarkdown(text) : escHtml(text);
     bubbleWrap.appendChild(bubble);
 
-    // Citations
     if (citations && citations.length) {
       const citeSection = document.createElement('div');
       citeSection.className = 'citations';
@@ -369,18 +374,18 @@
     messages.scrollTop = messages.scrollHeight;
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
+  /* =================================================================
      RESET
-     ══════════════════════════════════════════════════════════════════════════ */
+     ================================================================= */
   resetBtn.addEventListener('click', async function () {
     if (!confirm('This will clear ALL uploaded documents and reset the knowledge base. Continue?')) return;
 
     try {
       const resp = await fetch('/api/reset', { method: 'POST' });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Reset failed');
+      let data;
+      try { data = await resp.json(); } catch (_) { data = {}; }
+      if (!resp.ok) throw new Error(data.error || 'Reset failed (HTTP ' + resp.status + ')');
 
-      // Clear UI
       messages.innerHTML = '';
       if (welcomeScreen) {
         welcomeScreen.style.display = '';
@@ -390,13 +395,13 @@
       renderDocs([]);
       showToast('All documents cleared.', 'success');
     } catch (err) {
-      showToast(err.message, 'error');
+      showToast(errMsg(err), 'error');
     }
   });
 
-  /* ══════════════════════════════════════════════════════════════════════════
+  /* =================================================================
      INIT
-     ══════════════════════════════════════════════════════════════════════════ */
+     ================================================================= */
   loadDocs();
 
 }());
