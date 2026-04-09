@@ -36,6 +36,18 @@
       .replace(/"/g, '&quot;');
   }
 
+  /** Parse JSON from a fetch Response, throwing a readable error if the server
+   *  returned HTML (e.g. a Flask/Werkzeug 500 error page) instead of JSON. */
+  async function parseJSON(resp) {
+    const ct = resp.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      const text = await resp.text();
+      throw new Error('Server error (HTTP ' + resp.status + '). ' +
+        (text.length < 200 ? text : text.slice(0, 200) + '…'));
+    }
+    return resp.json();
+  }
+
   /** Minimal markdown → HTML: **bold**, `code`, bullet lists */
   function renderMarkdown(text) {
     return escHtml(text)
@@ -128,7 +140,7 @@
 
     try {
       const resp = await fetch('/api/docs', { method: 'POST', body: formData });
-      const data = await resp.json();
+      const data = await parseJSON(resp);
 
       if (!resp.ok) throw new Error(data.error || 'Upload failed');
 
@@ -165,7 +177,7 @@
   async function loadDocs() {
     try {
       const resp = await fetch('/api/docs');
-      const data = await resp.json();
+      const data = await parseJSON(resp);
       renderDocs(data.docs || []);
     } catch (_) { /* silent on initial load */ }
   }
@@ -215,7 +227,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ doc_id: docId, filename: filename })
       });
-      const data = await resp.json();
+      const data = await parseJSON(resp);
       typingEl.remove();
 
       if (!resp.ok) throw new Error(data.error || 'Summarize failed');
@@ -278,7 +290,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question, mode: currentMode })
       });
-      const data = await resp.json();
+      const data = await parseJSON(resp);
       typingEl.remove();
 
       if (!resp.ok) throw new Error(data.error || 'Chat request failed');
@@ -377,7 +389,7 @@
 
     try {
       const resp = await fetch('/api/reset', { method: 'POST' });
-      const data = await resp.json();
+      const data = await parseJSON(resp);
       if (!resp.ok) throw new Error(data.error || 'Reset failed');
 
       // Clear UI

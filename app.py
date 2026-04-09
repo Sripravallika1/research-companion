@@ -106,6 +106,8 @@ def chat():
         answer = agent.answer(question=question, mode=mode, sources=sources)
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An unexpected error occurred while generating the answer."}), 500
 
     citations = []
     for s in sources[:3]:
@@ -131,8 +133,13 @@ def summarize():
     if not doc_id:
         return jsonify({"error": "doc_id is required"}), 400
 
-    sources = store.similarity_search("summary overview introduction", k=6, doc_ids=[doc_id])
-    summary = agent.summarize(sources=sources, filename=filename)
+    try:
+        sources = store.similarity_search("summary overview introduction", k=6, doc_ids=[doc_id])
+        summary = agent.summarize(sources=sources, filename=filename)
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An unexpected error occurred while summarizing the document."}), 500
     return jsonify({"summary": summary, "doc_id": doc_id})
 
 

@@ -32,7 +32,18 @@ class OpenRouterClient:
             json=payload,
             timeout=60,
         )
-        data = r.json()
+        try:
+            data = r.json()
+        except Exception:
+            raise RuntimeError(f"OpenRouter returned a non-JSON response (HTTP {r.status_code}): {r.text[:200] + ('…' if len(r.text) > 200 else '')}")
         if not r.ok:
-            raise RuntimeError(data.get("error", {}).get("message", f"OpenRouter error {r.status_code}"))
-        return data["choices"][0]["message"]["content"]
+            error = data.get("error", {})
+            if isinstance(error, dict):
+                msg = error.get("message", f"OpenRouter error {r.status_code}")
+            else:
+                msg = str(error) if error else f"OpenRouter error {r.status_code}"
+            raise RuntimeError(msg)
+        choices = data.get("choices")
+        if not choices:
+            raise RuntimeError(f"OpenRouter returned no choices. Response: {str(data)[:200]}")
+        return choices[0]["message"]["content"]

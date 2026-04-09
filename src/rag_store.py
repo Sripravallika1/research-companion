@@ -64,5 +64,5 @@ class RAGStore:
         return list(seen.values())
 
     def reset(self):
-        self.client.reset()
+        self.client.delete_collection(self.collection_name)
         self.col = self.client.get_or_create_collection(name=self.collection_name)
