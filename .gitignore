@@ -1,1 +1,29 @@
+# Python
 src/__pycache__
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables — NEVER commit these
+.env
+
+# ChromaDB local database
+chroma_db/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Temp files
+*.tmp
+*.log
